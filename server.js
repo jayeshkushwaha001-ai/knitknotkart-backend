@@ -30,13 +30,17 @@ const razorpay = new Razorpay({
 
 // Configure Nodemailer Transporter
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: {
-        user: process.env.EMAIL_USER, // Render Dashboard se aayega
-        pass: process.env.EMAIL_PASS  // Render Dashboard se aayega
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS  
+    },
+    tls: {
+        rejectUnauthorized: false
     }
 });
-
 // ====================================================
 // 🚀 PUBLIC ROUTES
 // ====================================================
@@ -93,6 +97,7 @@ app.post('/api/payment/verify', async (req, res) => {
             .digest("hex");
 
         if (razorpay_signature === expectedSign) {
+            
             const newOrder = new Order({
                 customerName: customerDetails.name,
                 email: customerDetails.email,
@@ -100,11 +105,15 @@ app.post('/api/payment/verify', async (req, res) => {
                 address: customerDetails.address,
                 productName: JSON.stringify(cartItems),
                 amount: totalAmount,
-                paymentStatus: "Paid"                     
+                paymentStatus: "Paid"                    
             });
 
             await newOrder.save();
+            console.log("Order saved to database successfully!");
 
+            
+            let itemsListHTML = cartItems.map(item => `<li>${item.name} (x${item.qty}) - ₹${item.price * item.qty}</li>`).join('');
+            
             const customerMailOptions = {
                 from: `"KnitKnotKart" <${process.env.EMAIL_USER}>`,
                 to: customerDetails.email,
@@ -124,11 +133,9 @@ app.post('/api/payment/verify', async (req, res) => {
                 `
             };
 
-            let itemsListHTML = cartItems.map(item => `<li>${item.name} (x${item.qty}) - ₹${item.price * item.qty}</li>`).join('');
-
             const sellerMailOptions = {
                 from: `"KnitKnotKart Notification" <${process.env.EMAIL_USER}>`,
-                to: process.env.SELLER_EMAIL,
+                to: process.env.EMAIL_USER, 
                 subject: '🚨 New Order Received - KnitKnotKart',
                 html: `
                     <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #8B5E3C; background-color: #f5efe6;">
@@ -149,15 +156,23 @@ app.post('/api/payment/verify', async (req, res) => {
                 `
             };
 
-            await transporter.sendMail(customerMailOptions);
-            await transporter.sendMail(sellerMailOptions);
+            //  INNER TRY-CATCH FOR EMAILS 
+            try {
+               
+                transporter.sendMail(customerMailOptions).catch(err => console.log("Customer mail failed, but order is safe:", err));
+                transporter.sendMail(sellerMailOptions).catch(err => console.log("Seller mail failed, but order is safe:", err));
+            } catch (emailError) {
+                console.log("Issue in Email server:", emailError);
+            }
 
+            
             return res.status(200).json({ success: true, message: "Payment verified, order saved." });
+
         } else {
             return res.status(400).json({ success: false, message: "Invalid payment signature verification failed." });
         }
     } catch (error) {
-        console.error("Verification/Email Processing Error:", error);
+        console.error("Verification Processing Error:", error);
         res.status(500).json({ success: false, message: "Internal Server Error." });
     }
 });
