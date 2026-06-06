@@ -25,7 +25,7 @@ router.patch("/orders/:id", async (req, res) => {
         const updatedOrder = await Order.findByIdAndUpdate(
             req.params.id,
             { paymentStatus: status },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!updatedOrder) {
             return res.status(404).json({ success: false, message: "Order records not found." });
@@ -70,7 +70,7 @@ router.put("/products/:id", async (req, res) => {
         const updatedProduct = await Product.findByIdAndUpdate(
             req.params.id,
             { name, description, price, img, category },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!updatedProduct) return res.status(404).json({ success: false, message: "Product not found." });
         
