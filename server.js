@@ -68,6 +68,10 @@ app.get("/api/products", async (req, res) => {
     }
 });
 
+app.get('/api/payment/get-key', (req, res) => {
+    res.status(200).json({ key: process.env.RAZORPAY_KEY_ID });
+});
+
 app.post('/api/payment/order', async (req, res) => {
     try {
         const { amount } = req.body;
